@@ -4,45 +4,38 @@ import requests
 st.set_page_config(page_title="อัตราแลกเปลี่ยนจาก USD", page_icon="💱", layout="centered")
 st.title("อัตราแลกเปลี่ยนจาก USD")
 
-API_KEY = "8f733be7ef8287a2b59f288f"
+# ดึง API Key จาก Secrets
+API_KEY = st.secrets["EXCHANGE_API_KEY"]
+
 BASE = "USD"
-
-
 currencies = ["THB", "JPY", "EUR", "GBP", "AED"]
 
-# ดึงอัตราแลกเปลี่ยนของ BASE เพียงครั้งเดียว
-url = f"https://v6.exchangerate-api.com/v6/{API_KEY}/latest/{BASE}"
-try:
+# เรียก API
+def fetch_rates(base):
+    url = f"https://v6.exchangerate-api.com/v6/{API_KEY}/latest/{base}"
     r = requests.get(url, timeout=15)
     r.raise_for_status()
     data = r.json()
+    return data
 
-    if data.get("result") != "success":
-        st.error(f"API Error: {data}")
-    else:
-        rates = data.get("conversion_rates", {})
+try:
+    data = fetch_rates(BASE)
+    rates = data["conversion_rates"]
+    last_update = data.get("time_last_update_utc", "")
 
-        # 1) แสดง 1 USD = THB 
-        thb_rate = rates.get("THB")
-        if thb_rate is not None:
-            st.subheader(f"1 USD = {thb_rate:.2f} THB")
-        else:
-            st.warning("ไม่พบเรท THB ในข้อมูลที่ได้รับ")
+    # แสดงค่า USD → THB ใต้หัวข้อ
+    thb_rate = rates.get("THB")
+    if thb_rate:
+        st.subheader(f"1 USD = {thb_rate:.2f} THB")
 
-        st.divider()
+    st.divider()
 
-        # 2) เลือกสกุลเงินที่ต้องการดูเรทด้านล่าง (คงรูปแบบเดิม)
-        target = st.selectbox("เลือกสกุลเงินอื่น", options=currencies, index=1)  # default JPY
-        target_rate = rates.get(target)
-        if target_rate is not None:
-            st.subheader(f"1 USD = {target_rate:.2f} {target}")
-            st.caption(f'อัปเดตล่าสุด: {data.get("time_last_update_utc","")}')
-        else:
-            st.error("ไม่พบข้อมูลสกุลเงินที่เลือก")
+    # ให้ผู้ใช้เลือกสกุลเงินอื่น
+    target = st.selectbox("เลือกสกุลเงินอื่น", currencies, index=1)
+    rate = rates.get(target)
+    if rate:
+        st.subheader(f"1 USD = {rate:.2f} {target}")
+        st.caption(f"อัปเดตล่าสุด: {last_update}")
 
-except requests.HTTPError as e:
-    st.error(f"HTTP Error: {e}")
-except requests.RequestException as e:
-    st.error(f"Network Error: {e}")
 except Exception as e:
-    st.exception(e)
+    st.error(f"ไม่สามารถดึงข้อมูลได้: {e}")
